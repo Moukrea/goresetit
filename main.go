@@ -179,8 +179,8 @@ func main() {
 	if flags.DryRun {
 		fmt.Println(info.Render("\nDry run completed. No changes were pushed to remote."))
 	} else {
-		fmt.Printf(success.Render("\nRepository %s/%s has been reset with message: '%s'\n"),
-			repoInfo.FullPath, repoInfo.RepoName, commitMessage)
+		fmt.Println(success.Render(fmt.Sprintf("\nRepository %s/%s has been reset with message: '%s'",
+			repoInfo.FullPath, repoInfo.RepoName, commitMessage)))
 		fmt.Println(success.Render("All tags and releases have been deleted."))
 	}
 }

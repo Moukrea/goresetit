@@ -172,7 +172,7 @@ func main() {
 	}
 
 	if err := ResetRepo(repoInfo, commitMessage); err != nil {
-		fmt.Println(errorStyle.Render("Error:", err))
+		fmt.Println(errorStyle.Render(fmt.Sprintf("Error: %v", err)))
 		os.Exit(1)
 	}
 

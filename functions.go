@@ -181,10 +181,6 @@ func GetGitTags() ([]string, error) {
 
 func DeleteGitHubReleases(repoInfo RepoInfo) error {
 	client := newGitHubClient(repoInfo.Token)
-	// ... [previous functions.go content] ...
-
-func DeleteGitHubReleases(repoInfo RepoInfo) error {
-	client := newGitHubClient(repoInfo.Token)
 	ctx := context.Background()
 
 	releases, _, err := client.Repositories.ListReleases(ctx, repoInfo.FullPath, repoInfo.RepoName, nil)

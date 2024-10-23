@@ -141,7 +141,7 @@ func main() {
 		// Show confirmation prompt
 		confirmed, err := PromptConfirmation(flags.DryRun)
 		if err != nil {
-			fmt.Println(errorStyle.Render("Error during confirmation:", err))
+			fmt.Println(errorStyle.Render(fmt.Sprintf("Error during confirmation: %v", err)))
 			os.Exit(1)
 		}
 		if !confirmed {
@@ -153,7 +153,7 @@ func main() {
 		if commitMessage == "" {
 			message, err := PromptCommitMessage()
 			if err != nil {
-				fmt.Println(errorStyle.Render("Error getting commit message:", err))
+				fmt.Println(errorStyle.Render(fmt.Sprintf("Error getting commit message: %v", err)))
 				os.Exit(1)
 			}
 			if message == "" {

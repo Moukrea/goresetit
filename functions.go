@@ -114,7 +114,7 @@ func ResetRepo(repoInfo RepoInfo, commitMessage string) error {
 	}
 
 	if len(tags) > 0 {
-		fmt.Println(info.Render("Found %d tags to delete", len(tags)))
+		fmt.Println(info.Render(fmt.Sprintf("Found %d tags to delete", len(tags))))
 		for _, tag := range tags {
 			fmt.Println(info.Render("Removing local tag: %s", tag))
 			if err := RunGitCommandWithOutput("tag", "-d", tag); err != nil {

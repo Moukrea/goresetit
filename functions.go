@@ -128,7 +128,7 @@ func ResetRepo(repoInfo RepoInfo, commitMessage string) error {
 	// Handle remote operations
 	if repoInfo.DryRun {
 		if len(tags) > 0 {
-			fmt.Printf(info.Render("\nWould delete %d remote tags: %v\n"), len(tags), tags)
+			fmt.Println(info.Render(fmt.Sprintf("\nWould delete %d remote tags: %v", len(tags), tags)))
 		}
 		fmt.Println(info.Render("Would execute: git push -f origin main"))
 		return nil
@@ -138,7 +138,7 @@ func ResetRepo(repoInfo RepoInfo, commitMessage string) error {
 	if len(tags) > 0 {
 		for _, tag := range tags {
 			if err := RunGitCommandWithOutput("push", "origin", "--delete", fmt.Sprintf("refs/tags/%s", tag)); err != nil {
-				fmt.Println(warning.Render("Warning: Failed to delete remote tag %s: %v", tag, err))
+				fmt.Println(warning.Render(fmt.Sprintf("Warning: Failed to delete remote tag %s: %v", tag, err)))
 			} else {
 				fmt.Println(success.Render(fmt.Sprintf("Deleted remote tag: %s", tag)))
 			}
@@ -193,15 +193,15 @@ func DeleteGitHubReleases(repoInfo RepoInfo) error {
 		return nil
 	}
 
-	fmt.Println(info.Render("Found %d releases", len(releases)))
+	fmt.Println(info.Render(fmt.Sprintf("Found %d releases", len(releases))))
 
 	if repoInfo.DryRun {
 		fmt.Println(info.Render("\nThe following releases would be deleted:"))
 		for _, release := range releases {
-			fmt.Printf(info.Render("- Release %d: %s (tag: %s)\n"),
+			fmt.Println(info.Render(fmt.Sprintf("- Release %d: %s (tag: %s)",
 				*release.ID,
 				*release.Name,
-				*release.TagName)
+				*release.TagName)))
 		}
 	} else {
 		for _, release := range releases {
@@ -242,9 +242,9 @@ func DeleteGitLabReleases(repoInfo RepoInfo) error {
 	if repoInfo.DryRun {
 		fmt.Println(info.Render("\nThe following releases would be deleted:"))
 		for _, release := range releases {
-			fmt.Printf(info.Render("- Release: %s (tag: %s)\n"),
+			fmt.Println(info.Render(fmt.Sprintf("- Release: %s (tag: %s)",
 				release.Name,
-				release.TagName)
+				release.TagName)))
 		}
 	} else {
 		for _, release := range releases {

@@ -118,7 +118,7 @@ func ResetRepo(repoInfo RepoInfo, commitMessage string) error {
 		for _, tag := range tags {
 			fmt.Println(info.Render("Removing local tag: %s", tag))
 			if err := RunGitCommandWithOutput("tag", "-d", tag); err != nil {
-				fmt.Println(warning.Render("Warning: Failed to delete local tag %s: %v", tag, err))
+				fmt.Println(warning.Render(fmt.Sprintf("Warning: Failed to delete local tag %s: %v", tag, err)))
 			}
 		}
 	} else {
@@ -207,7 +207,7 @@ func DeleteGitHubReleases(repoInfo RepoInfo) error {
 		for _, release := range releases {
 			_, err := client.Repositories.DeleteRelease(ctx, repoInfo.FullPath, repoInfo.RepoName, *release.ID)
 			if err != nil {
-				fmt.Println(warning.Render("Warning: Failed to delete release %d: %v", *release.ID, err))
+				fmt.Println(warning.Render(fmt.Sprintf("Warning: Failed to delete release %d: %v", *release.ID, err)))
 			} else {
 				fmt.Println(success.Render("Deleted release %d: %s", *release.ID, *release.Name))
 			}
@@ -251,11 +251,11 @@ func DeleteGitLabReleases(repoInfo RepoInfo) error {
 			_, resp, err := client.Releases.DeleteRelease(fullPath, release.TagName)
 			if err != nil {
 				if resp != nil {
-					fmt.Println(warning.Render("Warning: Failed to delete release %s (status %d): %v",
-						release.TagName, resp.StatusCode, err))
+					fmt.Println(warning.Render(fmt.Sprintf("Warning: Failed to delete release %s (status %d): %v",
+						release.TagName, resp.StatusCode, err)))
 				} else {
-					fmt.Println(warning.Render("Warning: Failed to delete release %s: %v",
-						release.TagName, err))
+					fmt.Println(warning.Render(fmt.Sprintf("Warning: Failed to delete release %s: %v",
+						release.TagName, err)))
 				}
 			} else {
 				fmt.Println(success.Render("Deleted release: %s", release.Name))

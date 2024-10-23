@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'CHANGELOG.md'
+
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Run tests
+        run: |
+          go test -v ./tests/...
+
+  release:
+    needs: test
+    if: (github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch') && success()
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump_version.outputs.new_version }}
+      bump: ${{ steps.bump_version.outputs.bump }}
+      release_notes: ${{ steps.generate_release_notes.outputs.release_notes }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Get previous version tag
+        id: get_prev_version
+        run: |
+          git fetch --tags
+          TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "0.0.0")
+          echo "Previous tag: $TAG"
+          echo "prev_version=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Determine version bump and new version
+        id: bump_version
+        run: |
+          npm install -g semver
+
+          CURRENT_VERSION="${{ steps.get_prev_version.outputs.prev_version }}"
+          echo "Current version: $CURRENT_VERSION"
+
+          # Get commits since last tag (or from the beginning if no tags)
+          if [ "$CURRENT_VERSION" = "0.0.0" ]; then
+            COMMITS=$(git log --format=%B)
+          else
+            COMMITS=$(git log $CURRENT_VERSION..HEAD --format=%B)
+          fi
+
+          # Check for breaking changes
+          if echo "$COMMITS" | grep -qE '^[^\n]+\!:' || echo "$COMMITS" | grep -q 'BREAKING CHANGE:'; then
+            BUMP="major"
+          # Check for features
+          elif echo "$COMMITS" | grep -qE '^feat(\([^)]+\))?:'; then
+            BUMP="minor"
+          # Check for fixes
+          elif echo "$COMMITS" | grep -qE '^fix(\([^)]+\))?:'; then
+            BUMP="patch"
+          else
+            BUMP="none"
+          fi
+
+          if [ "$BUMP" = "none" ]; then
+            echo "No version bump required."
+            echo "bump=none" >> $GITHUB_OUTPUT
+            NEW_VERSION=$CURRENT_VERSION
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "Recommended bump: $BUMP"
+            echo "bump=$BUMP" >> $GITHUB_OUTPUT
+
+            # Calculate new version
+            if [ "$BUMP" = "major" ]; then
+              NEW_VERSION=$(semver -i major $CURRENT_VERSION)
+            elif [ "$BUMP" = "minor" ]; then
+              NEW_VERSION=$(semver -i minor $CURRENT_VERSION)
+            else
+              NEW_VERSION=$(semver -i patch $CURRENT_VERSION)
+            fi
+
+            echo "New version: $NEW_VERSION"
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate full changelog
+        if: steps.bump_version.outputs.bump != 'none'
+        run: |
+          npm install -g conventional-changelog-cli
+          conventional-changelog -p angular -i CHANGELOG.md -s -r 0
+
+      - name: Commit and push changelog
+        if: steps.bump_version.outputs.bump != 'none'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add CHANGELOG.md
+          git commit -m "chore(release): update changelog for version ${{ steps.bump_version.outputs.new_version }}"
+          git push "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main
+
+      - name: Generate release notes
+        if: steps.bump_version.outputs.bump != 'none'
+        id: generate_release_notes
+        run: |
+          npm install -g conventional-changelog-cli
+          conventional-changelog -p angular -r 1 -o RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Tag new version
+        if: steps.bump_version.outputs.bump != 'none'
+        run: |
+          git tag ${{ steps.bump_version.outputs.new_version }}
+          git push "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ${{ steps.bump_version.outputs.new_version }}
+
+  build:
+    needs: [test, release]
+    if: needs.release.outputs.bump != 'none'
+    strategy:
+      matrix:
+        bin: [goresetit]
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Build binary
+        run: |
+          OUTPUT_NAME="${{ matrix.bin }}-${{ matrix.os }}-${{ matrix.arch }}"
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            OUTPUT_NAME="${OUTPUT_NAME}.exe"
+          fi
+          mkdir -p dist
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-X 'main.version=${{ needs.release.outputs.new_version }}'" -o dist/$OUTPUT_NAME
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: dist/*
+
+  create_release:
+    needs: [test, release, build]
+    if: needs.release.outputs.bump != 'none'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+          path: dist
+
+      - name: List files in dist
+        run: |
+          ls -R dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.release.outputs.new_version }}
+          name: Release ${{ needs.release.outputs.new_version }}
+          body: ${{ needs.release.outputs.release_notes }}
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release created
+        run: |
+          echo "Release ${{ needs.release.outputs.new_version }} created successfully."
